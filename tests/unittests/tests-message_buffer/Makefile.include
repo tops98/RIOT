@@ -1,0 +1,3 @@
+USEMODULE += message_buffer
+
+INCLUDES += -I$(RIOTBASE)/sys/message_buffer

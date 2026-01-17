@@ -1,0 +1,3 @@
+USEMODULE += nec_protocol
+
+INCLUDES += -I$(RIOTBASE)/sys/nec_protocol
