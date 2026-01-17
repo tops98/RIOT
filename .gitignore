@@ -98,3 +98,6 @@ keys/
 # Environments
 .venv
 venv/
+
+# vscode
+.vscode/
