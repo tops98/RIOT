@@ -1,2 +1,4 @@
 USEMODULE += message_buffer
+USEMODULE += ztimer_msec
+USEMODULE += shell
 INCLUDES += -I$(RIOTBASE)/sys/message_buffer

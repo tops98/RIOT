@@ -14,6 +14,7 @@
 
 #include "embUnit/embUnit.h"
 
+#include "ztimer.h"
 #include "nec_protocol.h"
 #include "tests-nec_protocol.h"
 
@@ -22,7 +23,7 @@ static nec_protocol_context_t _nec_ctx;
 static void set_up(void)
 {
     memset(&_nec_ctx, 0, sizeof(_nec_ctx));
-    _nec_ctx.current_state = STATE_IDLE;
+    nec_protocol_init(&_nec_ctx);
 }
 
 static void tear_down(void)
@@ -43,13 +44,16 @@ static void test_initial_state(void)
  * Should transition from IDLE -> START -> RECEIVE
  */
 static void test_valid_start_sequence(void)
-{
+{   
+    /* Start sequence: RISING edge */
+    handle_event(EVENT_RISING, 0, &_nec_ctx);
+    
     /* Start sequence: RISING edge after 9ms */
-    handle_event(EVENT_RISING, START_HIGH_TIME_US, &_nec_ctx);
+    handle_event(EVENT_FALLING, START_HIGH_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_START, _nec_ctx.current_state);
 
     /* Continue with 4.5ms low */
-    handle_event(EVENT_FALLING, START_LOW_TIME_US, &_nec_ctx);
+    handle_event(EVENT_RISING, START_LOW_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
 
     /* Message should be initialized */
@@ -118,7 +122,7 @@ static void test_receive_logic_one(void)
     TEST_ASSERT_EQUAL_INT(1, _nec_ctx.bits_received);
 
     /* Bit should be 1 (set) */
-    TEST_ASSERT_EQUAL_INT(1, (_nec_ctx.current_msg->data[0] & 0x01));
+    TEST_ASSERT_EQUAL_INT(0b10000000, (_nec_ctx.current_msg->data[0]));
 }
 
 /**
@@ -127,8 +131,8 @@ static void test_receive_logic_one(void)
 static void test_receive_multiple_bits(void)
 {
     uint32_t i;
-    uint32_t expected_bits[] = {0, 1, 1, 0, 1, 0, 0, 1};
-    uint32_t expected_byte = 0x5A; /* 01011010 in binary (bits reversed) */
+    uint32_t expected_bits[] = {1,0,0,1,0,1,1,0};
+    uint32_t expected_byte = 0x96; /* 1001 0110 in binary */
 
     /* Set up for receiving */
     _nec_ctx.current_state = STATE_RECEIVE;
@@ -141,14 +145,17 @@ static void test_receive_multiple_bits(void)
     for (i = 0; i < 8; i++) {
         /* FALLING edge (high time) */
         handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
-
+        
         /* RISING edge with bit-specific timing */
         uint32_t bit_timing = (expected_bits[i] == 1) ? ONE_LOW_TIME_US : ZERO_LOW_TIME_US;
         handle_event(EVENT_RISING, bit_timing, &_nec_ctx);
-
+        
         TEST_ASSERT_EQUAL_INT(i + 1, _nec_ctx.bits_received);
     }
-
+    
+    handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
+    /* wait for timeout */
+    ztimer_sleep(ZTIMER_MSEC, 2);
     /* Verify the received byte */
     TEST_ASSERT_EQUAL_INT(expected_byte, _nec_ctx.current_msg->data[0]);
 }
@@ -185,7 +192,7 @@ static void test_timing_tolerance(void)
     _nec_ctx.current_state = STATE_START;
 
     /* Test with timing within tolerance for START_LOW */
-    handle_event(EVENT_FALLING, START_LOW_TIME_US + 8, &_nec_ctx);
+    handle_event(EVENT_RISING, START_LOW_TIME_US + 8, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
 }
 
@@ -227,13 +234,13 @@ static void test_check_timing_guard(void)
     uint32_t expected = 9000;
 
     /* Exact match */
-    TEST_ASSERT(!check_timing(duration, expected));
+    TEST_ASSERT(check_timing(duration, expected));
 
     /* Within tolerance */
-    TEST_ASSERT(!check_timing(duration + 5, expected));
+    TEST_ASSERT(check_timing(duration + 5, expected));
 
     /* Outside tolerance */
-    TEST_ASSERT(check_timing(duration + TIMING_ACCURCY_US + 1, expected));
+    TEST_ASSERT(!check_timing(duration + TIMING_ACCURCY_US + 1, expected));
 }
 
 static Test *tests_nec_protocol_tests(void)

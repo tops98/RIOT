@@ -4,10 +4,12 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <ztimer.h>
 #include "message_buffer.h"
 
 #define TIMING_ACCURCY_US 10
 #define TRANSITION_COUNT  11
+#define RECV_TIMEOUT_MS   2
 #define START_HIGH_TIME_US ((uint32_t)9000)
 #define START_LOW_TIME_US  ((uint32_t)4500)
 #define RECV_HIGH_TIME_US  ((uint32_t)560)
@@ -32,6 +34,7 @@ typedef struct {
     Message* current_msg;
     uint32_t bits_received;
     State current_state;
+    ztimer_t timer;
 } nec_protocol_context_t;
 
 typedef bool (*TimeGuardFn)(uint32_t duration_us, uint32_t expected_duration_us);
@@ -48,5 +51,6 @@ typedef struct {
 
 /* Function declarations */
 bool check_timing(uint32_t duration_us, uint32_t expected_duration_us);
+void nec_protocol_init(nec_protocol_context_t *ctx);
 void handle_event(Event event, uint32_t duration_us, nec_protocol_context_t *ctx);
 #endif /* NEC_PROTOCOL_H */

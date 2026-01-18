@@ -1,3 +1,4 @@
 USEMODULE += nec_protocol
+USEMODULE += ztimer_msec
 
 INCLUDES += -I$(RIOTBASE)/sys/nec_protocol
