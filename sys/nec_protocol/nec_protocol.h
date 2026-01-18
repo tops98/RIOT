@@ -7,7 +7,10 @@
 #include <ztimer.h>
 #include "message_buffer.h"
 
-#define TIMING_ACCURCY_US 400
+#ifndef TIMING_ACCURCY_US
+    #define TIMING_ACCURCY_US 400
+#endif
+
 #define RECV_TIMEOUT_MS   2
 #define START_HIGH_TIME_US ((uint32_t)9000)
 #define START_LOW_TIME_US  ((uint32_t)4500)
