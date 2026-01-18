@@ -19,15 +19,31 @@
 #include "tests-nec_protocol.h"
 
 static nec_protocol_context_t _nec_ctx;
+static ztimer_now_t last_falling_edge = 0;
+
+static void mock_pulse_sending(uint32_t high_duration_us) {
+    ztimer_now_t low_duration = 0;
+    ztimer_now_t current_time = ztimer_now(ZTIMER_USEC);
+    
+    if(last_falling_edge){
+        low_duration = current_time - last_falling_edge;
+        nec_protocol_handle_event(EVENT_RISING, low_duration, &_nec_ctx);
+    }else{
+        nec_protocol_handle_event(EVENT_RISING, 0, &_nec_ctx);
+    }
+    nec_protocol_handle_event(EVENT_FALLING, high_duration_us, &_nec_ctx);
+    last_falling_edge = current_time;
+}
 
 static void set_up(void)
 {
     memset(&_nec_ctx, 0, sizeof(_nec_ctx));
-    nec_protocol_init(&_nec_ctx);
+    nec_protocol_init(&_nec_ctx, mock_pulse_sending);
 }
 
 static void tear_down(void)
 {
+    nec_protocol_init(&_nec_ctx, mock_pulse_sending);
     memset(&_nec_ctx, 0, sizeof(_nec_ctx));
 }
 
@@ -46,14 +62,14 @@ static void test_initial_state(void)
 static void test_valid_start_sequence(void)
 {   
     /* Start sequence: RISING edge */
-    handle_event(EVENT_RISING, 0, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_RISING, 0, &_nec_ctx);
     
     /* Start sequence: RISING edge after 9ms */
-    handle_event(EVENT_FALLING, START_HIGH_TIME_US, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_FALLING, START_HIGH_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_START, _nec_ctx.current_state);
 
     /* Continue with 4.5ms low */
-    handle_event(EVENT_RISING, START_LOW_TIME_US, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_RISING, START_LOW_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
 
     /* Message should be initialized */
@@ -68,11 +84,11 @@ static void test_valid_start_sequence(void)
 static void test_invalid_start_timing(void)
 {
     /* RISING edge with incorrect timing (too short) */
-    handle_event(EVENT_RISING, 5000, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_RISING, 5000, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_START, _nec_ctx.current_state);
 
     /* FALLING edge with incorrect timing - should go back to IDLE */
-    handle_event(EVENT_FALLING, 2000, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_FALLING, 2000, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_IDLE, _nec_ctx.current_state);
 }
 
@@ -88,11 +104,11 @@ static void test_receive_logic_zero(void)
     _nec_ctx.bits_received = 0;
 
     /* FALLING edge with normal timing */
-    handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
 
     /* RISING edge with zero bit timing */
-    handle_event(EVENT_RISING, ZERO_LOW_TIME_US, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_RISING, ZERO_LOW_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
     TEST_ASSERT_EQUAL_INT(1, _nec_ctx.bits_received);
 
@@ -113,11 +129,11 @@ static void test_receive_logic_one(void)
     _nec_ctx.bits_received = 0;
 
     /* FALLING edge with normal timing */
-    handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
 
     /* RISING edge with one bit timing */
-    handle_event(EVENT_RISING, ONE_LOW_TIME_US, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_RISING, ONE_LOW_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
     TEST_ASSERT_EQUAL_INT(1, _nec_ctx.bits_received);
 
@@ -144,16 +160,16 @@ static void test_receive_multiple_bits(void)
     /* Receive 8 bits */
     for (i = 0; i < 8; i++) {
         /* FALLING edge (high time) */
-        handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
+        nec_protocol_handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
         
         /* RISING edge with bit-specific timing */
         uint32_t bit_timing = (expected_bits[i] == 1) ? ONE_LOW_TIME_US : ZERO_LOW_TIME_US;
-        handle_event(EVENT_RISING, bit_timing, &_nec_ctx);
+        nec_protocol_handle_event(EVENT_RISING, bit_timing, &_nec_ctx);
         
         TEST_ASSERT_EQUAL_INT(i + 1, _nec_ctx.bits_received);
     }
     
-    handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
     /* wait for timeout */
     ztimer_sleep(ZTIMER_MSEC, 2);
     /* Verify the received byte */
@@ -172,10 +188,10 @@ static void test_invalid_bit_timing(void)
     _nec_ctx.bits_received = 0;
 
     /* FALLING edge with normal timing */
-    handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
 
     /* RISING edge with invalid timing (too long) */
-    handle_event(EVENT_RISING, 3000, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_RISING, 3000, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_IDLE, _nec_ctx.current_state);
 }
 
@@ -185,14 +201,14 @@ static void test_invalid_bit_timing(void)
 static void test_timing_tolerance(void)
 {
     /* Test with timing within tolerance (slightly above START_HIGH_TIME_US) */
-    handle_event(EVENT_RISING, START_HIGH_TIME_US + 5, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_RISING, START_HIGH_TIME_US + 5, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_START, _nec_ctx.current_state);
 
     /* Set up for next transition */
     _nec_ctx.current_state = STATE_START;
 
     /* Test with timing within tolerance for START_LOW */
-    handle_event(EVENT_RISING, START_LOW_TIME_US + 8, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_RISING, START_LOW_TIME_US + 8, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
 }
 
@@ -202,11 +218,11 @@ static void test_timing_tolerance(void)
 static void test_timing_tolerance_exceeded(void)
 {
     /* Test with timing exceeding tolerance */
-    handle_event(EVENT_RISING, START_HIGH_TIME_US + TIMING_ACCURCY_US + 1, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_RISING, START_HIGH_TIME_US + TIMING_ACCURCY_US + 1, &_nec_ctx);
     
     /* Since the guard fails, should fall through to default transition */
     /* Next we try a FALLING event */
-    handle_event(EVENT_FALLING, START_LOW_TIME_US, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_FALLING, START_LOW_TIME_US, &_nec_ctx);
     
     /* Should return to IDLE since the previous START sequence was invalid */
     TEST_ASSERT_EQUAL_INT(STATE_IDLE, _nec_ctx.current_state);
@@ -219,7 +235,7 @@ static void test_idle_falling_edge(void)
 {
     TEST_ASSERT_EQUAL_INT(STATE_IDLE, _nec_ctx.current_state);
     
-    handle_event(EVENT_FALLING, 1000, &_nec_ctx);
+    nec_protocol_handle_event(EVENT_FALLING, 1000, &_nec_ctx);
     
     /* Should remain in IDLE */
     TEST_ASSERT_EQUAL_INT(STATE_IDLE, _nec_ctx.current_state);
@@ -243,6 +259,66 @@ static void test_check_timing_guard(void)
     TEST_ASSERT(!check_timing(duration + TIMING_ACCURCY_US + 1, expected));
 }
 
+static void test_send_logic_one(void) {
+    uint8_t expected_data[] ={0b10000000}; 
+    Message buffer;
+    nec_protocol_context_t ctx =  _nec_ctx;
+    (void)ctx;
+    nec_protocoll_send(expected_data, 1, &_nec_ctx);
+    ztimer_sleep(ZTIMER_MSEC,500);
+    TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
+    
+    message_queue_pop(&_nec_ctx.msg_buffer, &buffer);
+    
+    TEST_ASSERT_EQUAL_INT(1, buffer.len);
+    TEST_ASSERT_EQUAL_INT(expected_data[0], _nec_ctx.msg_buffer.msg[0].data[0]);
+}
+
+static void test_send_logic_zero(void) {
+    uint8_t expected_data[] ={0b00000000}; 
+    Message buffer;
+    nec_protocol_context_t ctx =  _nec_ctx;
+    (void)ctx;
+    nec_protocoll_send(expected_data, 1, &_nec_ctx);
+    ztimer_sleep(ZTIMER_MSEC,500);
+    TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
+    
+    message_queue_pop(&_nec_ctx.msg_buffer, &buffer);
+    
+    TEST_ASSERT_EQUAL_INT(1, buffer.len);
+    TEST_ASSERT_EQUAL_INT(expected_data[0], _nec_ctx.msg_buffer.msg[0].data[0]);
+}
+
+static void test_send_byte(void) {
+    uint8_t expected_data[] ={0b11010100}; 
+    Message buffer;
+    nec_protocol_context_t ctx =  _nec_ctx;
+    (void)ctx;
+    nec_protocoll_send(expected_data, 1, &_nec_ctx);
+    ztimer_sleep(ZTIMER_MSEC,500);
+    TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
+    
+    message_queue_pop(&_nec_ctx.msg_buffer, &buffer);
+    
+    TEST_ASSERT_EQUAL_INT(1, buffer.len);
+    TEST_ASSERT_EQUAL_INT(expected_data[0], _nec_ctx.msg_buffer.msg[0].data[0]);
+}
+
+static void test_send_multiple_bytes(void) {
+    uint8_t expected_data[] ="Hello world"; 
+    Message buffer;
+    nec_protocol_context_t ctx =  _nec_ctx;
+    (void)ctx;
+    nec_protocoll_send(expected_data, sizeof(expected_data), &_nec_ctx);
+    ztimer_sleep(ZTIMER_MSEC,500);
+    TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
+    
+    message_queue_pop(&_nec_ctx.msg_buffer, &buffer);
+    
+    TEST_ASSERT_EQUAL_INT(sizeof(expected_data), buffer.len);
+    TEST_ASSERT_EQUAL_STRING((char*)expected_data, (char*)_nec_ctx.msg_buffer.msg[0].data);
+}
+
 static Test *tests_nec_protocol_tests(void)
 {
     EMB_UNIT_TESTFIXTURES(fixtures) {
@@ -257,6 +333,11 @@ static Test *tests_nec_protocol_tests(void)
         new_TestFixture(test_timing_tolerance_exceeded),
         new_TestFixture(test_idle_falling_edge),
         new_TestFixture(test_check_timing_guard),
+        // these tests are timing dependend and my fail! TODO: refactor with moctimer
+        new_TestFixture(test_send_logic_one),
+        new_TestFixture(test_send_logic_zero),
+        new_TestFixture(test_send_byte),
+        new_TestFixture(test_send_multiple_bytes),
     };
 
     EMB_UNIT_TESTCALLER(nec_protocol_tests, set_up, tear_down, fixtures);
