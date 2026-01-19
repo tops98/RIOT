@@ -254,6 +254,7 @@ static void test_check_timing_guard(void)
 
     /* Within tolerance */
     TEST_ASSERT(check_timing(duration + 5, expected));
+    TEST_ASSERT(check_timing(duration - 5, expected));
 
     /* Outside tolerance */
     TEST_ASSERT(!check_timing(duration + TIMING_ACCURCY_US + 1, expected));
@@ -264,7 +265,7 @@ static void test_send_logic_one(void) {
     Message buffer;
     nec_protocol_context_t ctx =  _nec_ctx;
     (void)ctx;
-    nec_protocoll_send(expected_data, 1, &_nec_ctx);
+    nec_protocol_send(expected_data, 1, &_nec_ctx);
     ztimer_sleep(ZTIMER_MSEC,500);
     TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
     
@@ -279,7 +280,7 @@ static void test_send_logic_zero(void) {
     Message buffer;
     nec_protocol_context_t ctx =  _nec_ctx;
     (void)ctx;
-    nec_protocoll_send(expected_data, 1, &_nec_ctx);
+    nec_protocol_send(expected_data, 1, &_nec_ctx);
     ztimer_sleep(ZTIMER_MSEC,500);
     TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
     
@@ -294,7 +295,7 @@ static void test_send_byte(void) {
     Message buffer;
     nec_protocol_context_t ctx =  _nec_ctx;
     (void)ctx;
-    nec_protocoll_send(expected_data, 1, &_nec_ctx);
+    nec_protocol_send(expected_data, 1, &_nec_ctx);
     ztimer_sleep(ZTIMER_MSEC,500);
     TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
     
@@ -309,7 +310,7 @@ static void test_send_multiple_bytes(void) {
     Message buffer;
     nec_protocol_context_t ctx =  _nec_ctx;
     (void)ctx;
-    nec_protocoll_send(expected_data, sizeof(expected_data), &_nec_ctx);
+    nec_protocol_send(expected_data, sizeof(expected_data), &_nec_ctx);
     ztimer_sleep(ZTIMER_MSEC,500);
     TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
     

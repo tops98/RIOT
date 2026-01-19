@@ -26,8 +26,8 @@ typedef enum {
 } State;
 
 typedef enum {
-    EVENT_RISING,
     EVENT_FALLING,
+    EVENT_RISING,
     EVENT_TIMEOUT
 } Event;
 
@@ -59,5 +59,5 @@ typedef struct {
 bool check_timing(uint32_t duration_us, uint32_t expected_duration_us);
 void nec_protocol_init(nec_protocol_context_t *ctx, SendPulseFn send_pulse);
 void nec_protocol_handle_event(Event event, uint32_t duration_us, nec_protocol_context_t *ctx);
-void nec_protocoll_send(uint8_t* data, uint16_t len, nec_protocol_context_t *ctx);
+void nec_protocol_send(uint8_t* data, uint16_t len, nec_protocol_context_t *ctx);
 #endif /* NEC_PROTOCOL_H */

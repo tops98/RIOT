@@ -4,7 +4,10 @@
 
 bool check_timing(uint32_t duration_us, uint32_t expected_duration_us)
 {
-    return (duration_us - expected_duration_us) < TIMING_ACCURCY_US;
+    uint32_t diff = (duration_us > expected_duration_us) ? 
+                    (duration_us - expected_duration_us) : 
+                    (expected_duration_us - duration_us);
+    return diff < TIMING_ACCURCY_US;
 }
 
 static void start_receival(nec_protocol_context_t *ctx)
@@ -17,7 +20,9 @@ static void start_receival(nec_protocol_context_t *ctx)
 static void end_receival(nec_protocol_context_t *ctx)
 {
     ctx->current_msg->len = ctx->bits_received / 8;
-    message_queue_commit(&ctx->msg_buffer);
+    if(ctx->bits_received > 0){
+        message_queue_commit(&ctx->msg_buffer);
+    }   
 }
 
 void timer_callback(void *arg)
@@ -103,7 +108,7 @@ void nec_protocol_handle_event(Event event, uint32_t duration_us, nec_protocol_c
     }
 }
 
-void nec_protocoll_send(uint8_t* data, uint16_t len, nec_protocol_context_t *ctx){
+void nec_protocol_send(uint8_t* data, uint16_t len, nec_protocol_context_t *ctx){
     uint8_t current_byte = 0;
     uint8_t current_bit = 0;
 
