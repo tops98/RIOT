@@ -1,6 +1,10 @@
 #ifndef NEC_PROTOCOL_H
 #define NEC_PROTOCOL_H
 
+#ifndef MSG_BUFFER_SIZE
+    #define MSG_BUFFER_SIZE 10
+#endif
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>

@@ -319,7 +319,7 @@ extern const uint8_t ieee802154_addr_bcast[IEEE802154_ADDR_BCAST_LEN];
  * @brief IEEE802.15.4 default channel
  */
 #ifndef CONFIG_IEEE802154_DEFAULT_CHANNEL
-#define CONFIG_IEEE802154_DEFAULT_CHANNEL          (26U)
+#define CONFIG_IEEE802154_DEFAULT_CHANNEL          (25U)
 #endif
 
 /**

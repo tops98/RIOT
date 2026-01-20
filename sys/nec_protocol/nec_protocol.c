@@ -19,7 +19,7 @@ static void start_receival(nec_protocol_context_t *ctx)
 
 static void end_receival(nec_protocol_context_t *ctx)
 {
-    ctx->current_msg->len = ctx->bits_received / 8;
+    ctx->current_msg->len = 1 + ctx->bits_received / 8;
     if(ctx->bits_received > 0){
         message_queue_commit(&ctx->msg_buffer);
     }   

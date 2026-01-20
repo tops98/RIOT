@@ -1,4 +1,5 @@
 #include "message_buffer.h"
+#include <string.h>
 
 // WARNING NOT THREAD SAFE!!!
 
@@ -9,9 +10,7 @@ bool message_queue_pop(MessageQueue *q, Message *buffer) {
     }
 
     buffer->len = q->msg[q->tail].len;
-    for (uint32_t i = 0; i < q->msg[q->tail].len; i++) {
-        buffer->data[i] = q->msg[q->tail].data[i];
-    }
+    memcpy(buffer->data, q->msg[q->tail].data, buffer->len);
 
     q->tail = (q->tail + 1) % MSG_BUFFER_SIZE;
     q->is_full = false;
@@ -26,6 +25,7 @@ void message_queue_commit(MessageQueue *q) {
 }
 
 Message* message_queue_get_editable(MessageQueue *q) {
+    memset(q->msg[q->head].data, 0, MAX_MSG_LEN);
     return &q->msg[q->head];
 }
 
