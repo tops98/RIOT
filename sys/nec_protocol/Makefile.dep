@@ -1,5 +1,6 @@
 USEMODULE += message_buffer
 USEMODULE += ztimer_msec
+USEMODULE += tsrb
 
 INCLUDES += -I$(RIOTBASE)/sys/message_buffer
 INCLUDES += -I$(RIOTBASE)/sys/nec_protocol
