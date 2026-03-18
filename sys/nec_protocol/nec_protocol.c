@@ -3,6 +3,10 @@
 #include "debug.h"
 
 
+void reset_byte_buffer(nec_protocol_context_t *ctx){
+    ctx->current_byte = ctx->current_bit = 0;
+}
+
 bool check_timing(uint32_t duration_us, uint32_t expected_duration_us)
 {
     uint32_t diff = (duration_us > expected_duration_us) ? 
@@ -58,7 +62,7 @@ const Transition fsm[] = {
     { STATE_START,   EVENT_FALLING, check_timing, START_HIGH_TIME_US,   NULL,               STATE_START },
     { STATE_START,   EVENT_FALLING, NULL,         0,                    NULL,               STATE_IDLE },
 
-    { STATE_START,   EVENT_RISING, check_timing, START_LOW_TIME_US,     NULL,               STATE_RECEIVE },
+    { STATE_START,   EVENT_RISING, check_timing, START_LOW_TIME_US,     reset_byte_buffer,  STATE_RECEIVE },
     { STATE_START,   EVENT_RISING,  NULL,         0,                    NULL,               STATE_IDLE },
 
     /* RECEIVE STATE */
