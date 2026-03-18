@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <ztimer.h>
+#include "tsrb.h"
 #include "message_buffer.h"
 
 #ifndef TIMING_ACCURCY_US
@@ -38,9 +39,9 @@ typedef enum {
 typedef void (*SendPulseFn)(uint32_t pulse_durration_us);
 
 typedef struct {
-    MessageQueue msg_buffer;
-    Message* current_msg;
-    uint32_t bits_received;
+    tsrb_t recv_buffer;
+    uint8_t current_byte;
+    uint8_t current_bit;
     State current_state;
     ztimer_t timer;
     SendPulseFn send_pulse;
@@ -61,7 +62,7 @@ typedef struct {
 
 /* Function declarations */
 bool check_timing(uint32_t duration_us, uint32_t expected_duration_us);
-void nec_protocol_init(nec_protocol_context_t *ctx, SendPulseFn send_pulse);
+void nec_protocol_init(nec_protocol_context_t *ctx, uint8_t* in_buffer, uint32_t buffer_size, SendPulseFn send_pulse);
 void nec_protocol_handle_event(Event event, uint32_t duration_us, nec_protocol_context_t *ctx);
 void nec_protocol_send(uint8_t* data, uint16_t len, nec_protocol_context_t *ctx);
 #endif /* NEC_PROTOCOL_H */

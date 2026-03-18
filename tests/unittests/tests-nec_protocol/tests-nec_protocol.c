@@ -1,13 +1,3 @@
-/*
- * SPDX-License-Identifier: LGPL-2.1-only
- */
-
-/**
- * @{
- *
- * @file
- */
-
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
@@ -19,32 +9,43 @@
 #include "tests-nec_protocol.h"
 
 static nec_protocol_context_t _nec_ctx;
-static ztimer_now_t last_falling_edge = 0;
+static ztimer_now_t last_call = 0;
+static uint8_t buffer[100];
 
 static void mock_pulse_sending(uint32_t high_duration_us) {
-    ztimer_now_t low_duration = 0;
-    ztimer_now_t current_time = ztimer_now(ZTIMER_USEC);
+    // ztimer_now_t low_duration = 0;
+    // ztimer_now_t current_time = ztimer_now(ZTIMER_USEC);
     
-    if(last_falling_edge){
-        low_duration = current_time - last_falling_edge;
-        nec_protocol_handle_event(EVENT_RISING, low_duration, &_nec_ctx);
-    }else{
-        nec_protocol_handle_event(EVENT_RISING, 0, &_nec_ctx);
-    }
+    // if(last_falling_edge){
+    //     low_duration = current_time - last_falling_edge;
+    //     nec_protocol_handle_event(EVENT_RISING, low_duration, &_nec_ctx);
+    // }else{
+    //     nec_protocol_handle_event(EVENT_RISING, 0, &_nec_ctx);
+    // }
+    // nec_protocol_handle_event(EVENT_FALLING, high_duration_us, &_nec_ctx);
+    // last_falling_edge = current_time;
+
+    ztimer_now_t low_duration = ztimer_now(ZTIMER_USEC) - last_call;
+
+    nec_protocol_handle_event(EVENT_RISING, low_duration, &_nec_ctx);
     nec_protocol_handle_event(EVENT_FALLING, high_duration_us, &_nec_ctx);
-    last_falling_edge = current_time;
+
+
+    last_call = ztimer_now(ZTIMER_USEC);
 }
 
 static void set_up(void)
 {
     memset(&_nec_ctx, 0, sizeof(_nec_ctx));
-    nec_protocol_init(&_nec_ctx, mock_pulse_sending);
+    nec_protocol_init(&_nec_ctx, buffer, sizeof(buffer), mock_pulse_sending);
+    last_call = 300000000;
 }
 
 static void tear_down(void)
 {
-    nec_protocol_init(&_nec_ctx, mock_pulse_sending);
+    nec_protocol_init(&_nec_ctx, buffer, sizeof(buffer), mock_pulse_sending);
     memset(&_nec_ctx, 0, sizeof(_nec_ctx));
+    last_call = 300000000;
 }
 
 /**
@@ -71,10 +72,6 @@ static void test_valid_start_sequence(void)
     /* Continue with 4.5ms low */
     nec_protocol_handle_event(EVENT_RISING, START_LOW_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
-
-    /* Message should be initialized */
-    TEST_ASSERT_NOT_NULL(_nec_ctx.current_msg);
-    TEST_ASSERT_EQUAL_INT(0, _nec_ctx.bits_received);
 }
 
 /**
@@ -99,9 +96,6 @@ static void test_receive_logic_zero(void)
 {
     /* Set up for receiving */
     _nec_ctx.current_state = STATE_RECEIVE;
-    _nec_ctx.current_msg = &_nec_ctx.msg_buffer.msg[0];
-    _nec_ctx.current_msg->len = 0;
-    _nec_ctx.bits_received = 0;
 
     /* FALLING edge with normal timing */
     nec_protocol_handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
@@ -110,10 +104,8 @@ static void test_receive_logic_zero(void)
     /* RISING edge with zero bit timing */
     nec_protocol_handle_event(EVENT_RISING, ZERO_LOW_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
-    TEST_ASSERT_EQUAL_INT(1, _nec_ctx.bits_received);
-
-    /* Bit should be 0 (not set) */
-    TEST_ASSERT_EQUAL_INT(0, (_nec_ctx.current_msg->data[0] & 0x01));
+    TEST_ASSERT_EQUAL_INT(0, _nec_ctx.current_byte);
+    TEST_ASSERT_EQUAL_INT(1, _nec_ctx.current_bit);
 }
 
 /**
@@ -123,10 +115,6 @@ static void test_receive_logic_one(void)
 {
     /* Set up for receiving */
     _nec_ctx.current_state = STATE_RECEIVE;
-    _nec_ctx.current_msg = &_nec_ctx.msg_buffer.msg[0];
-    _nec_ctx.current_msg->len = 0;
-    _nec_ctx.current_msg->data[0] = 0;
-    _nec_ctx.bits_received = 0;
 
     /* FALLING edge with normal timing */
     nec_protocol_handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
@@ -135,10 +123,10 @@ static void test_receive_logic_one(void)
     /* RISING edge with one bit timing */
     nec_protocol_handle_event(EVENT_RISING, ONE_LOW_TIME_US, &_nec_ctx);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, _nec_ctx.current_state);
-    TEST_ASSERT_EQUAL_INT(1, _nec_ctx.bits_received);
+    TEST_ASSERT_EQUAL_INT(1, _nec_ctx.current_bit);
 
     /* Bit should be 1 (set) */
-    TEST_ASSERT_EQUAL_INT(0b10000000, (_nec_ctx.current_msg->data[0]));
+    TEST_ASSERT_EQUAL_INT(0b10000000, _nec_ctx.current_byte);
 }
 
 /**
@@ -152,13 +140,12 @@ static void test_receive_multiple_bits(void)
 
     /* Set up for receiving */
     _nec_ctx.current_state = STATE_RECEIVE;
-    _nec_ctx.current_msg = &_nec_ctx.msg_buffer.msg[0];
-    _nec_ctx.current_msg->len = 0;
-    _nec_ctx.current_msg->data[0] = 0;
-    _nec_ctx.bits_received = 0;
 
     /* Receive 8 bits */
     for (i = 0; i < 8; i++) {
+        
+        TEST_ASSERT_EQUAL_INT(i %8, _nec_ctx.current_bit);
+        
         /* FALLING edge (high time) */
         nec_protocol_handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
         
@@ -166,14 +153,14 @@ static void test_receive_multiple_bits(void)
         uint32_t bit_timing = (expected_bits[i] == 1) ? ONE_LOW_TIME_US : ZERO_LOW_TIME_US;
         nec_protocol_handle_event(EVENT_RISING, bit_timing, &_nec_ctx);
         
-        TEST_ASSERT_EQUAL_INT(i + 1, _nec_ctx.bits_received);
     }
     
     nec_protocol_handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
     /* wait for timeout */
     ztimer_sleep(ZTIMER_MSEC, 2);
     /* Verify the received byte */
-    TEST_ASSERT_EQUAL_INT(expected_byte, _nec_ctx.current_msg->data[0]);
+    uint8_t received_byte = tsrb_get_one(&_nec_ctx.recv_buffer);
+    TEST_ASSERT_EQUAL_INT(expected_byte, received_byte);
 }
 
 /**
@@ -183,9 +170,6 @@ static void test_invalid_bit_timing(void)
 {
     /* Set up for receiving */
     _nec_ctx.current_state = STATE_RECEIVE;
-    _nec_ctx.current_msg = &_nec_ctx.msg_buffer.msg[0];
-    _nec_ctx.current_msg->len = 0;
-    _nec_ctx.bits_received = 0;
 
     /* FALLING edge with normal timing */
     nec_protocol_handle_event(EVENT_FALLING, RECV_HIGH_TIME_US, &_nec_ctx);
@@ -262,62 +246,46 @@ static void test_check_timing_guard(void)
 
 static void test_send_logic_one(void) {
     uint8_t expected_data[] ={0b10000000}; 
-    Message buffer;
     nec_protocol_context_t ctx =  _nec_ctx;
     (void)ctx;
     nec_protocol_send(expected_data, 1, &_nec_ctx);
-    ztimer_sleep(ZTIMER_MSEC,500);
-    TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
+    ztimer_sleep(ZTIMER_MSEC, 500);
     
-    message_queue_pop(&_nec_ctx.msg_buffer, &buffer);
-    
-    TEST_ASSERT_EQUAL_INT(1, buffer.len);
-    TEST_ASSERT_EQUAL_INT(expected_data[0], _nec_ctx.msg_buffer.msg[0].data[0]);
+    TEST_ASSERT_EQUAL_INT(1, tsrb_avail(&_nec_ctx.recv_buffer));
+    TEST_ASSERT_EQUAL_INT(expected_data[0], tsrb_get_one(&_nec_ctx.recv_buffer));
 }
 
 static void test_send_logic_zero(void) {
-    uint8_t expected_data[] ={0b00000000}; 
-    Message buffer;
-    nec_protocol_context_t ctx =  _nec_ctx;
-    (void)ctx;
+    uint8_t expected_data[] ={0b00000000};
+
     nec_protocol_send(expected_data, 1, &_nec_ctx);
     ztimer_sleep(ZTIMER_MSEC,500);
-    TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
     
-    message_queue_pop(&_nec_ctx.msg_buffer, &buffer);
-    
-    TEST_ASSERT_EQUAL_INT(1, buffer.len);
-    TEST_ASSERT_EQUAL_INT(expected_data[0], _nec_ctx.msg_buffer.msg[0].data[0]);
+    TEST_ASSERT_EQUAL_INT(1, tsrb_avail(&_nec_ctx.recv_buffer));
+    TEST_ASSERT_EQUAL_INT(expected_data[0], tsrb_get_one(&_nec_ctx.recv_buffer));
 }
 
 static void test_send_byte(void) {
-    uint8_t expected_data[] ={0b11010100}; 
-    Message buffer;
-    nec_protocol_context_t ctx =  _nec_ctx;
-    (void)ctx;
+    uint8_t expected_data[] ={0b11010100};
+    
     nec_protocol_send(expected_data, 1, &_nec_ctx);
     ztimer_sleep(ZTIMER_MSEC,500);
-    TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
-    
-    message_queue_pop(&_nec_ctx.msg_buffer, &buffer);
-    
-    TEST_ASSERT_EQUAL_INT(1, buffer.len);
-    TEST_ASSERT_EQUAL_INT(expected_data[0], _nec_ctx.msg_buffer.msg[0].data[0]);
+
+    TEST_ASSERT_EQUAL_INT(1, tsrb_avail(&_nec_ctx.recv_buffer));
+    TEST_ASSERT_EQUAL_INT(expected_data[0], tsrb_get_one(&_nec_ctx.recv_buffer));
 }
 
 static void test_send_multiple_bytes(void) {
-    uint8_t expected_data[] ="Hello world"; 
-    Message buffer;
-    nec_protocol_context_t ctx =  _nec_ctx;
-    (void)ctx;
+    uint8_t expected_data[] ="Hello world";
+    uint8_t actual_data[50] = {0};
+
     nec_protocol_send(expected_data, sizeof(expected_data), &_nec_ctx);
-    ztimer_sleep(ZTIMER_MSEC,500);
-    TEST_ASSERT_EQUAL_INT(1, message_queue_length(&_nec_ctx.msg_buffer));
-    
-    message_queue_pop(&_nec_ctx.msg_buffer, &buffer);
-    
-    TEST_ASSERT_EQUAL_INT(sizeof(expected_data), buffer.len);
-    TEST_ASSERT_EQUAL_STRING((char*)expected_data, (char*)_nec_ctx.msg_buffer.msg[0].data);
+    ztimer_sleep(ZTIMER_MSEC, 500);
+
+    TEST_ASSERT_EQUAL_INT(sizeof(expected_data), tsrb_avail(&_nec_ctx.recv_buffer));
+
+    tsrb_get(&_nec_ctx.recv_buffer, actual_data, sizeof(expected_data));
+    TEST_ASSERT_EQUAL_STRING((char*)expected_data, (char*)actual_data);
 }
 
 static Test *tests_nec_protocol_tests(void)

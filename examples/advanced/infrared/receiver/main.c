@@ -6,7 +6,7 @@
 #include "thread.h"
 #include "nec_protocol.h"
 
-
+uint8_t recv_buffer[1024]= {0};
 // ++++++++++++++++++++++++++ interrupt config ++++++++++++++++++++++++++ //
 #define DEBOUNCE_DELAY_US 10                                // debounce delay in us
 static bool signal                      = false;            // true: falling edge, false: rising edge
@@ -91,7 +91,7 @@ bool init_infrared(void)
     LOG_INFO("Interrupt initialized!\n");
     
     // nec protocol init
-    nec_protocol_init(&nec_ctx, NULL);
+    nec_protocol_init(&nec_ctx, recv_buffer, sizeof(recv_buffer), NULL);
     LOG_INFO("After init, nec_ctx.send_pulse: %p\n", (void*)nec_ctx.send_pulse);
     
     // setup receive thread
@@ -111,15 +111,21 @@ int main(void)
         while (1){}
     }
 
+
     uint16_t count = 0;
-    Message ir_message_buffer;
+    int byte = 0;
     while (true)
     {   
-        if(message_queue_pop(&nec_ctx.msg_buffer, &ir_message_buffer))
+        if(tsrb_avail(&nec_ctx.recv_buffer) > 0)
         {
-            LOG_INFO("Received message of len (%lu): '%s' [%d]\n", ir_message_buffer.len, ir_message_buffer.data, count);
+            LOG_INFO("Received message:");
+            while ((byte =tsrb_get_one(&nec_ctx.recv_buffer)))
+            {
+                LOG_INFO("%c", (char)byte);
+            }
+            LOG_INFO("[%d]\n", count);
             count++;
         }
-        ztimer_sleep(ZTIMER_MSEC,2000);
+        ztimer_sleep(ZTIMER_MSEC,100);
     }
 }
