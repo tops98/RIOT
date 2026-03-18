@@ -113,18 +113,22 @@ int main(void)
 
 
     uint16_t count = 0;
-    int byte = 0;
+    uint8_t byte = 0;
+    
     while (true)
     {   
         if(tsrb_avail(&nec_ctx.recv_buffer) > 0)
         {
-            LOG_INFO("Received message:");
-            while ((byte =tsrb_get_one(&nec_ctx.recv_buffer)))
-            {
+            if(byte == 0){
+                LOG_INFO("Received message:");
+            }
+            byte = tsrb_get_one(&nec_ctx.recv_buffer);
+            
+            if(byte == 0){
+                LOG_INFO(" [%d]\n", count++);
+            }else{
                 LOG_INFO("%c", (char)byte);
             }
-            LOG_INFO("[%d]\n", count);
-            count++;
         }
         ztimer_sleep(ZTIMER_MSEC,100);
     }
