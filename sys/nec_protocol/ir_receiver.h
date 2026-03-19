@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <periph/gpio.h>
 #include <thread.h>
-#include "fsm.h"
 #include "tsrb.h"
+#include "fsm.h"
 
 
 typedef struct InfraredReceiver{

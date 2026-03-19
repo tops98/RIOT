@@ -44,11 +44,7 @@ void ir_receiver_init(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buf
     tsrb_init(&receiver->recv_buffer, in_buffer, buffer_size);
     tsrb_clear(&receiver->recv_buffer);
 
-    if(gpio_init_int(recv_gpio, GPIO_IN_PU, GPIO_BOTH, interrupt_callback, receiver) != 0){
-        LOG_ERROR("Initializing interrupt failed!\n");
-        return;
-    }
-
+    gpio_init_int(recv_gpio, GPIO_IN_PU, GPIO_BOTH, interrupt_callback, receiver);
     thread_create(receiver->receive_thread_stack, sizeof(receiver->receive_thread_stack), THREAD_PRIORITY_MAIN - 1, 0, receive_thread, receiver,"ir_recv");
 }
 

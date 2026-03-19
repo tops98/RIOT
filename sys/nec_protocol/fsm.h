@@ -1,5 +1,5 @@
-#ifndef NEC_PROTOCOL_H
-#define NEC_PROTOCOL_H
+#ifndef IR_FSM_H
+#define IR_FSM_H
 
 
 #include <stdint.h>
@@ -18,8 +18,6 @@ typedef enum {
     EVENT_RISING,
     EVENT_TIMEOUT
 } Event;
-
-typedef struct Transition transition_t;
 
 typedef struct FsmState{
     State current_state;
@@ -40,11 +38,6 @@ typedef struct IrTransmissionTiming {
     uint16_t zero_low_time_us;
     uint16_t one_low_time_us; 
 } ir_transmission_timing_t;
-
-
-typedef void (*SendPulseFn)(uint32_t pulse_durration_us);
-typedef bool (*TimeGuardFn)(uint32_t duration_us, uint32_t expected_duration_us);
-typedef void (*ActionFn)(fsm_state_t *ctx);
 
 
 /* Function declarations */

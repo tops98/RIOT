@@ -4,6 +4,10 @@
 #include "debug.h"
 
 
+typedef void (*SendPulseFn)(uint32_t pulse_durration_us);
+typedef bool (*TimeGuardFn)(uint32_t duration_us, uint32_t expected_duration_us);
+typedef void (*ActionFn)(fsm_state_t *ctx);
+
 typedef enum {
     START_HIGH_TIME_US,
     START_LOW_TIME_US,
