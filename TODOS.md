@@ -21,10 +21,9 @@ Things to take care of before creating a PR for the NEC-Module
 + Review code according to modern C coding standards and RIOT conventions
 ### Protocol
 + Create proper error handling
-+ Split Logic in receive and send ???
-+ Include PWM functions in NEC-Module
++ Split Logic in receive and send ??? [✔️]
++ Include PWM functions in NEC-Module [✔️]
 + Optimizes statemachine ???
 
 ### Memory
-+ Set Message and Buffer size in  init using maloc
-+ Replace old message_buffer module with cleaner solution
++ Replace old message_buffer module with cleaner solution [✔️]

@@ -1,0 +1,3 @@
+USEMODULE += infrared
+
+INCLUDES += -I$(RIOTBASE)/sys/infrared
