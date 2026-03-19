@@ -1,3 +1,5 @@
 USEMODULE += infrared
+USEMODULE += tsrb
+USEMODULE += ztimer_mock
 
 INCLUDES += -I$(RIOTBASE)/sys/infrared
