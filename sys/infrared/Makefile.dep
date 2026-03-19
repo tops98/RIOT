@@ -1,0 +1,6 @@
+USEMODULE += message_buffer
+USEMODULE += ztimer_msec
+USEMODULE += tsrb
+USEMODULE += sema
+
+INCLUDES += -I$(RIOTBASE)/sys/infrared

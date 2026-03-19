@@ -29,7 +29,8 @@ const static ir_transmission_timing_t DEFAULT_TIMING = {
     .one_low_time_us = 1687
 };
 
-void ir_receiver_init(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size, ir_transmission_timing_t timing);
+void ir_receiver_init_custom_timing(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size, ir_transmission_timing_t timing);
+void ir_receiver_init(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size);
 tsrb_t* ir_receiver_get_buffer(const ir_receiver_t* ir_receiver);
 
 #endif
