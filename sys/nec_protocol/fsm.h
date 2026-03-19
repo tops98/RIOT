@@ -28,6 +28,6 @@ typedef struct IrTransmissionTiming {
 
 /* Function declarations */
 void fsm_handle_event(Event event, uint32_t duration_us, fsm_state_t *ctx);
-void fsm_init(fsm_state_t *fsm, tsrb_t *recv_buffer, ir_transmission_timing_t timing);
+fsm_state_t fsm_init(tsrb_t *recv_buffer, ir_transmission_timing_t timing);
 
 #endif /* NEC_PROTOCOL_H */

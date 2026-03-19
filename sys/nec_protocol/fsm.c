@@ -104,6 +104,7 @@ void timer_callback(void *arg)
 }
 
 static void set_timout(fsm_state_t *ctx){
+    ctx->timer.arg = ctx;
     ztimer_set(ZTIMER_MSEC, &ctx->timer, ctx->timing.transmission_timeout_ms);
 }
 
@@ -163,14 +164,19 @@ void fsm_handle_event(Event event, uint32_t duration_us, fsm_state_t *ctx)
     }
 }
 
-void fsm_init(fsm_state_t *fsm, tsrb_t *recv_buffer, ir_transmission_timing_t timing){
+fsm_state_t fsm_init(tsrb_t *recv_buffer, ir_transmission_timing_t timing){
     
-    fsm->recv_buffer = recv_buffer;
-    fsm->current_bit = 0;
-    fsm->current_byte = 0;
-    fsm->current_state = STATE_IDLE;
+    fsm_state_t fsm = {
+        .timing = timing,
+        .recv_buffer = recv_buffer,
+        .current_bit = 0,
+        .current_byte = 0,
+        .current_state = STATE_IDLE,
+    };
 
-    ztimer_remove(ZTIMER_MSEC, &fsm->timer);
-    fsm->timer.callback = timer_callback;
-    fsm->timer.arg = fsm;
+    ztimer_remove(ZTIMER_MSEC, &fsm.timer);
+    fsm.timer.callback = timer_callback;
+    fsm.timer.arg = NULL;
+
+    return fsm;
 }
