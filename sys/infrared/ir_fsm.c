@@ -1,4 +1,4 @@
-#include "fsm.h"
+#include "ir_fsm.h"
 #include <stddef.h>
 #include <ztimer.h>
 #include "debug.h"
