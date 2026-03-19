@@ -5,18 +5,6 @@
 
 
 typedef enum {
-    STATE_IDLE,
-    STATE_START,
-    STATE_RECEIVE
-} State;
-
-typedef enum {
-    EVENT_FALLING,
-    EVENT_RISING,
-    EVENT_TIMEOUT
-} Event;
-
-typedef enum {
     START_HIGH_TIME_US,
     START_LOW_TIME_US,
     RECV_HIGH_TIME_US,
@@ -32,15 +20,6 @@ typedef struct Transition{
     ActionFn    action;
     State       to;
 } transition_t;
-
-typedef struct FsmState{
-    State current_state;
-    ztimer_t timer;
-    uint8_t current_byte;
-    uint8_t current_bit;
-    tsrb_t *recv_buffer;
-    ir_transmission_timing_t timing;
-} fsm_state_t;
 
 
 static void bit_received(fsm_state_t *ctx, bool bit)
@@ -164,7 +143,7 @@ void fsm_handle_event(Event event, uint32_t duration_us, fsm_state_t *ctx)
     }
 }
 
-fsm_state_t fsm_init(tsrb_t *recv_buffer, ir_transmission_timing_t timing){
+fsm_state_t fsm_create(tsrb_t *recv_buffer, ir_transmission_timing_t timing){
     
     fsm_state_t fsm = {
         .timing = timing,
