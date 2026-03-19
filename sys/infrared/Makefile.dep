@@ -1,6 +1,7 @@
-USEMODULE += message_buffer
 USEMODULE += ztimer_msec
 USEMODULE += tsrb
 USEMODULE += sema
+USEMODULE += periph_gpio
+USEMODULE += periph_gpio_irq
 
 INCLUDES += -I$(RIOTBASE)/sys/infrared

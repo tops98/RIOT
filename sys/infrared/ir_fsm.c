@@ -4,9 +4,6 @@
 #include "debug.h"
 
 
-typedef void (*SendPulseFn)(uint32_t pulse_durration_us);
-typedef bool (*TimeGuardFn)(uint32_t duration_us, uint32_t expected_duration_us);
-typedef void (*ActionFn)(fsm_state_t *ctx);
 
 typedef enum {
     START_HIGH_TIME_US,
@@ -15,6 +12,10 @@ typedef enum {
     ZERO_LOW_TIME_US,
     ONE_LOW_TIME_US,    
 } Timings;
+
+typedef void (*SendPulseFn)(uint32_t pulse_durration_us);
+typedef bool (*TimeGuardFn)(uint32_t duration_us, Timings expected_duration_us, ir_fsm_state_t *ctx);
+typedef void (*ActionFn)(ir_fsm_state_t *ctx);
 
 typedef struct Transition{
     State       from;
@@ -26,20 +27,20 @@ typedef struct Transition{
 } transition_t;
 
 
-static void bit_received(fsm_state_t *ctx, bool bit)
+static void bit_received(ir_fsm_state_t *ctx, bool bit)
 {
     ztimer_remove(ZTIMER_MSEC, &ctx->timer);
 
     ctx->current_byte |= bit << (7 - ctx->current_bit++);
     if(ctx->current_bit >=8){
-        if(tsrb_full(&ctx->recv_buffer) == 0){
-            tsrb_add_one(&ctx->recv_buffer, ctx->current_byte);
+        if(tsrb_full(ctx->recv_buffer) == 0){
+            tsrb_add_one(ctx->recv_buffer, ctx->current_byte);
         }
         ctx->current_byte = ctx->current_bit = 0;
     }
 }
 
-bool check_timing(uint32_t duration_us, uint8_t timing, fsm_state_t *ctx)
+bool check_timing(uint32_t duration_us, Timings timing, ir_fsm_state_t *ctx)
 {
     uint32_t expected_duration_us = 0;
 
@@ -67,26 +68,26 @@ bool check_timing(uint32_t duration_us, uint8_t timing, fsm_state_t *ctx)
     return diff < ctx->timing.timing_tollerance_us;
 }
 
-static void receive_logic_0(fsm_state_t *ctx)
+static void receive_logic_0(ir_fsm_state_t *ctx)
 {
     bit_received(ctx, false);
 }
 
-static void receive_logic_1(fsm_state_t *ctx)
+static void receive_logic_1(ir_fsm_state_t *ctx)
 {
     bit_received(ctx, true);
 }
 
-void reset_byte_buffer(fsm_state_t *ctx){
+void reset_byte_buffer(ir_fsm_state_t *ctx){
     ctx->current_byte = ctx->current_bit = 0;
 }
 
 void timer_callback(void *arg)
 {
-    nec_protocol_handle_event(EVENT_TIMEOUT, 0, arg);
+    ir_fsm_handle_event(EVENT_TIMEOUT, 0, arg);
 }
 
-static void set_timout(fsm_state_t *ctx){
+static void set_timout(ir_fsm_state_t *ctx){
     ctx->timer.arg = ctx;
     ztimer_set(ZTIMER_MSEC, &ctx->timer, ctx->timing.transmission_timeout_ms);
 }
@@ -121,7 +122,7 @@ const transition_t fsm[] = {
 };
 static const uint8_t num_transitions = sizeof(fsm) / sizeof(transition_t);
 
-void fsm_handle_event(Event event, uint32_t duration_us, fsm_state_t *ctx)
+void ir_fsm_handle_event(Event event, uint32_t duration_us, ir_fsm_state_t *ctx)
 {
 
     transition_t current_transition = fsm[0];
@@ -132,7 +133,7 @@ void fsm_handle_event(Event event, uint32_t duration_us, fsm_state_t *ctx)
             continue;
         }
         // is guard failing
-        if (current_transition.guard != NULL && !current_transition.guard(duration_us, current_transition.expected_duration_us)){
+        if (current_transition.guard != NULL && !current_transition.guard(duration_us, current_transition.expected_duration_us, ctx)){
             continue;
         }
 
@@ -147,9 +148,9 @@ void fsm_handle_event(Event event, uint32_t duration_us, fsm_state_t *ctx)
     }
 }
 
-fsm_state_t fsm_create(tsrb_t *recv_buffer, ir_transmission_timing_t timing){
+ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, ir_transmission_timing_t timing){
     
-    fsm_state_t fsm = {
+    ir_fsm_state_t fsm = {
         .timing = timing,
         .recv_buffer = recv_buffer,
         .current_bit = 0,

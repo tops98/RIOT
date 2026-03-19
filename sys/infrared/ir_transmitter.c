@@ -18,6 +18,10 @@ void send_pulse(uint32_t duration_us)
     SET_PWM_SIGNAL(PWM_OFF);
 }
 
+void ir_transmitter_send(uint8_t* data, uint16_t len){
+    ir_transmitter_send_custom_timing(data, len, IR_DEFAULT_TIMING);
+}
+
 void ir_transmitter_send_custom_timing(uint8_t* data, uint16_t len, ir_transmission_timing_t timing){
     uint8_t current_byte = 0;
     uint8_t current_bit = 0;
@@ -38,8 +42,4 @@ void ir_transmitter_send_custom_timing(uint8_t* data, uint16_t len, ir_transmiss
     }
     send_pulse(timing.recv_high_time_us);
     ztimer_sleep(ZTIMER_MSEC, timing.transmission_timeout_ms);
-}
-
-void ir_transmitter_send(uint8_t* data, uint16_t len){
-    infrared_transmit_custom_timing(data, len, DEFAULT_TIMING);
 }

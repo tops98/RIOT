@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <ztimer.h>
-#include <sema.h>
+#include <memory.h>
 
 
 void interrupt_callback(void* arg)
@@ -29,14 +29,18 @@ void *receive_thread(void* arg)
             rising_time = ctx->int_timestamp_us;
             duration = rising_time - falling_time;
         }
-        nec_protocol_handle_event(ctx->int_flank, duration, &ctx);
+        ir_fsm_handle_event(ctx->int_flank, duration, &ctx->fsm);
     }
+}
+
+void ir_receiver_init(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size){
+    ir_receiver_init_custom_timing(receiver, recv_gpio, in_buffer, buffer_size, IR_DEFAULT_TIMING);
 }
 
 void ir_receiver_init_custom_timing(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size, ir_transmission_timing_t timing){
     memset(receiver, 0, sizeof(ir_receiver_t));
     
-    receiver->fsm = fsm_create(&receiver->recv_buffer, timing);
+    receiver->fsm = ir_fsm_create(&receiver->recv_buffer, timing);
     receiver->rec_pin = recv_gpio;
 
     sema_create(&receiver->fsm_sema, 0);
@@ -48,10 +52,6 @@ void ir_receiver_init_custom_timing(ir_receiver_t* receiver, gpio_t recv_gpio, u
     thread_create(receiver->receive_thread_stack, sizeof(receiver->receive_thread_stack), THREAD_PRIORITY_MAIN - 1, 0, receive_thread, receiver,"ir_recv");
 }
 
-void ir_receiver_init(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size){
-    ir_receiver_init_custom_timing(receiver, recv_gpio, in_buffer, buffer_size, DEFAULT_TIMING);
-}
-
-tsrb_t* ir_receiver_get_buffer(const ir_receiver_t* receiver){
+tsrb_t* ir_receiver_get_buffer(ir_receiver_t* receiver){
     return &receiver->recv_buffer;
 }
