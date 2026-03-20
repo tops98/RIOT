@@ -1,4 +1,5 @@
 USEMODULE += ztimer_msec
+USEMODULE += ztimer_usec
 USEMODULE += tsrb
 USEMODULE += sema
 USEMODULE += periph_gpio
