@@ -27,9 +27,19 @@ typedef struct Transition{
 } transition_t;
 
 
+static void arm_timer(ir_fsm_state_t *ctx){
+    ctx->timer.arg = ctx;
+    ztimer_set(ZTIMER_MSEC, &ctx->timer, ctx->timing.transmission_timeout_ms);
+}
+
+static void reset_timer(ir_fsm_state_t *ctx){
+    ztimer_remove(ZTIMER_MSEC, &ctx->timer);
+    arm_timer(ctx);
+}
+
 static void bit_received(ir_fsm_state_t *ctx, bool bit)
 {
-    ztimer_remove(ZTIMER_MSEC, &ctx->timer);
+    reset_timer(ctx);
 
     ctx->current_byte |= bit << (7 - ctx->current_bit++);
     if(ctx->current_bit >=8){
@@ -87,11 +97,6 @@ void timer_callback(void *arg)
     ir_fsm_handle_event(EVENT_TIMEOUT, 0, arg);
 }
 
-static void set_timout(ir_fsm_state_t *ctx){
-    ctx->timer.arg = ctx;
-    ztimer_set(ZTIMER_MSEC, &ctx->timer, ctx->timing.transmission_timeout_ms);
-}
-
 
 /*
  * WARNING:
@@ -101,17 +106,17 @@ static void set_timout(ir_fsm_state_t *ctx){
 const transition_t fsm[] = {
     /* IDLE STATE */
     { STATE_IDLE,    EVENT_FALLING, NULL,         0,                    NULL,               STATE_IDLE },
-    { STATE_IDLE,    EVENT_RISING,  NULL,         0,                    NULL,               STATE_START },
+    { STATE_IDLE,    EVENT_RISING,  NULL,         0,                    arm_timer,          STATE_START },
 
     /* START STATE */
-    { STATE_START,   EVENT_FALLING, check_timing, START_HIGH_TIME_US,   NULL,               STATE_START },
+    { STATE_START,   EVENT_FALLING, check_timing, START_HIGH_TIME_US,   reset_timer,        STATE_START },
     { STATE_START,   EVENT_FALLING, NULL,         0,                    NULL,               STATE_IDLE },
 
     { STATE_START,   EVENT_RISING, check_timing, START_LOW_TIME_US,     reset_byte_buffer,  STATE_RECEIVE },
     { STATE_START,   EVENT_RISING,  NULL,         0,                    NULL,               STATE_IDLE },
 
     /* RECEIVE STATE */
-    { STATE_RECEIVE, EVENT_FALLING, check_timing, RECV_HIGH_TIME_US,    set_timout,         STATE_RECEIVE },
+    { STATE_RECEIVE, EVENT_FALLING, check_timing, RECV_HIGH_TIME_US,    reset_timer,        STATE_RECEIVE },
     { STATE_RECEIVE, EVENT_FALLING, NULL,         0,                    NULL,               STATE_IDLE },
 
     { STATE_RECEIVE, EVENT_RISING,  check_timing, ZERO_LOW_TIME_US,     receive_logic_0,    STATE_RECEIVE },
