@@ -17,6 +17,7 @@ typedef struct InfraredReceiver{
     ir_fsm_state_t fsm;
     tsrb_t recv_buffer;
     char receive_thread_stack[THREAD_STACKSIZE_DEFAULT];
+    kernel_pid_t thread_pid;
 } ir_receiver_t;
 
 void ir_receiver_init_custom_timing(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size, ir_transmission_timing_t timing);

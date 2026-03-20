@@ -49,7 +49,7 @@ void ir_receiver_init_custom_timing(ir_receiver_t* receiver, gpio_t recv_gpio, u
     tsrb_clear(&receiver->recv_buffer);
 
     gpio_init_int(recv_gpio, GPIO_IN_PU, GPIO_BOTH, interrupt_callback, receiver);
-    thread_create(receiver->receive_thread_stack, sizeof(receiver->receive_thread_stack), THREAD_PRIORITY_MAIN - 1, 0, receive_thread, receiver,"ir_recv");
+    receiver->thread_pid = thread_create(receiver->receive_thread_stack, sizeof(receiver->receive_thread_stack), THREAD_PRIORITY_MAIN - 1, 0, receive_thread, receiver,"ir_recv");
 }
 
 tsrb_t* ir_receiver_get_buffer(ir_receiver_t* receiver){
