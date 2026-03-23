@@ -22,7 +22,7 @@ static void set_up(void)
     tsrb_init(&recv_buff, buffer, sizeof(buffer));
     tsrb_clear(&recv_buff);
 
-    fsm = ir_fsm_create(&recv_buff, IR_DEFAULT_TIMING);
+    fsm = ir_fsm_create(&recv_buff, IR_DEFAULT_TIMING, &mock_timer.super);
 }
 
 static void test_fsm_create(void)
@@ -34,36 +34,90 @@ static void test_fsm_create(void)
     TEST_ASSERT(tsrb_empty(fsm.recv_buffer));
 }
 
-/**
- * Test: Valid NEC start sequence (9ms high, 4.5ms low)
- * Should transition from IDLE -> START -> RECEIVE
- */
-static void test_valid_start_sequence(void)
-{   
-    /* Start sequence: RISING edge */
-    ir_fsm_handle_event(EVENT_RISING, 0, &fsm);
-    
-    /* Start sequence: RISING edge after 9ms */
-    ir_fsm_handle_event(EVENT_FALLING, fsm.timing.start_high_time_us, &fsm);
-    TEST_ASSERT_EQUAL_INT(STATE_START, fsm.current_state);
 
-    /* Continue with 4.5ms low */
-    ir_fsm_handle_event(EVENT_RISING, fsm.timing.start_low_time_us, &fsm);
-    TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, fsm.current_state);
+static void test_idle_state(void)
+{
+    TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
+    
+    /* Falling  shoudl be ignored*/
+    ir_fsm_handle_event(EVENT_FALLING, 0, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
+
+    /* RSING  leads to START*/
+    ir_fsm_handle_event(EVENT_RISING, 0, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_START, fsm.current_state);
 }
 
-/**
- * Test: Invalid start sequence with wrong timing
- * Should return to IDLE if timing is incorrect
- */
-static void test_invalid_start_timing(void)
+static void test_start_state(void)
 {
-    /* RISING edge with incorrect timing (too short) */
-    ir_fsm_handle_event(EVENT_RISING, 5000, &fsm);
+    fsm.current_state = STATE_START;
+
+    /* Falling  with correct timing*/
+    ir_fsm_handle_event(EVENT_FALLING, IR_DEFAULT_TIMING.start_high_time_us, &fsm);
     TEST_ASSERT_EQUAL_INT(STATE_START, fsm.current_state);
 
-    /* FALLING edge with incorrect timing - should go back to IDLE */
-    ir_fsm_handle_event(EVENT_FALLING, 2000, &fsm);
+    /* Falling  with incorrect timing*/
+    ir_fsm_handle_event(EVENT_FALLING, 0, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
+
+    
+    /* RISING  with correct timing*/
+    fsm.current_state = STATE_START;
+    fsm.current_bit = 5;
+    fsm.current_byte = 3;
+    ir_fsm_handle_event(EVENT_RISING, IR_DEFAULT_TIMING.start_low_time_us, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, fsm.current_state);
+    /* Verify that the current bit and byte are reset */
+    TEST_ASSERT_EQUAL_INT(0, fsm.current_bit);
+    TEST_ASSERT_EQUAL_INT(0, fsm.current_byte);
+
+    /* RISING  with incorrect timing*/
+    fsm.current_state = STATE_START;
+    ir_fsm_handle_event(EVENT_RISING, 0, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
+
+    /* Timeout Event*/
+    /* go first from IDLE to START to arm timer*/
+    fsm.current_state = STATE_IDLE;
+    ir_fsm_handle_event(EVENT_RISING, 0, &fsm);
+    /* Advance mock timer */
+    ztimer_mock_advance(&mock_timer, IR_DEFAULT_TIMING.transmission_timeout_ms);
+    TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
+}
+
+static void test_receive_state(void)
+{
+    fsm.current_state = STATE_RECEIVE;
+
+    /* Falling  with correct timing*/
+    ir_fsm_handle_event(EVENT_FALLING, IR_DEFAULT_TIMING.recv_high_time_us, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, fsm.current_state);
+
+    /* Falling  with incorrect timing*/
+    ir_fsm_handle_event(EVENT_FALLING, 0, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
+
+    /* RISING  with correct timing for logic 0*/
+    fsm.current_state = STATE_RECEIVE;
+    ir_fsm_handle_event(EVENT_RISING, IR_DEFAULT_TIMING.zero_low_time_us, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, fsm.current_state);
+
+    /* RISING  with correct timing for logic 1*/
+    fsm.current_state = STATE_RECEIVE;
+    ir_fsm_handle_event(EVENT_RISING, IR_DEFAULT_TIMING.one_low_time_us, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, fsm.current_state);
+
+    /* RISING  with incorrect timing*/
+    fsm.current_state = STATE_RECEIVE;
+    ir_fsm_handle_event(EVENT_RISING, 0, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
+
+    /* Timeout Event*/
+    /* go first from START to RECEIVE to arm timer*/
+    fsm.current_state = STATE_START;
+    ir_fsm_handle_event(EVENT_RISING, IR_DEFAULT_TIMING.start_low_time_us, &fsm);
+    /* Advance mock timer */
+    ztimer_mock_advance(&mock_timer, IR_DEFAULT_TIMING.transmission_timeout_ms);
     TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
 }
 
@@ -142,78 +196,51 @@ static void test_receive_multiple_bits(void)
 }
 
 /**
- * Test: Invalid bit timing returns to IDLE
- */
-static void test_invalid_bit_timing(void)
-{
-    /* Set up for receiving */
-    fsm.current_state = STATE_RECEIVE;
-
-    /* FALLING edge with normal timing */
-    ir_fsm_handle_event(EVENT_FALLING, fsm.timing.recv_high_time_us, &fsm);
-
-    /* RISING edge with invalid timing (too long) */
-    ir_fsm_handle_event(EVENT_RISING, 3000, &fsm);
-    TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
-}
-
-/**
  * Test: Timing tolerance (TIMING_ACCURACY_US)
  */
 static void test_timing_tolerance(void)
 {
-    /* Test with timing within tolerance (slightly above START_HIGH_TIME_US) */
-    ir_fsm_handle_event(EVENT_RISING, fsm.timing.start_high_time_us + 5, &fsm);
-    TEST_ASSERT_EQUAL_INT(STATE_START, fsm.current_state);
+    ztimer_now_t duration= 0;
 
-    /* Set up for next transition */
+    /* Test with timing within tolerance (above START_HIGH_TIME_US) */
     fsm.current_state = STATE_START;
-
-    /* Test with timing within tolerance for START_LOW */
-    ir_fsm_handle_event(EVENT_RISING, fsm.timing.start_low_time_us + 8, &fsm);
+    duration = fsm.timing.start_low_time_us + fsm.timing.timing_tollerance_us;
+    ir_fsm_handle_event(EVENT_RISING, duration, &fsm);
     TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, fsm.current_state);
-}
+    
+    /* Test with timing within tolerance (below START_HIGH_TIME_US) */
+    fsm.current_state = STATE_START;
+    duration = fsm.timing.start_low_time_us - fsm.timing.timing_tollerance_us;
+    ir_fsm_handle_event(EVENT_RISING, duration, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_RECEIVE, fsm.current_state);
 
-/**
- * Test: Timing tolerance exceeded
- */
-static void test_timing_tolerance_exceeded(void)
-{
-    /* Test with timing exceeding tolerance */
-    ir_fsm_handle_event(EVENT_RISING, fsm.timing.start_high_time_us + fsm.timing.timing_tollerance_us + 1, &fsm);
+    /* Test with timing not within tolerance (above START_HIGH_TIME_US)*/
+    fsm.current_state = STATE_START;
+    duration = fsm.timing.start_low_time_us + fsm.timing.timing_tollerance_us + 1;
+    ir_fsm_handle_event(EVENT_RISING, duration, &fsm);
+    TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
     
-    /* Since the guard fails, should fall through to default transition */
-    /* Next we try a FALLING event */
-    ir_fsm_handle_event(EVENT_FALLING, fsm.timing.start_low_time_us, &fsm);
-    
-    /* Should return to IDLE since the previous START sequence was invalid */
+    /* Test with timing not within tolerance (below START_HIGH_TIME_US)*/
+    fsm.current_state = STATE_START;
+    duration = fsm.timing.start_low_time_us - fsm.timing.timing_tollerance_us - 1;
+    ir_fsm_handle_event(EVENT_RISING, duration, &fsm);
     TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
 }
 
-/**
- * Test: Falling edge in IDLE state (should stay in IDLE)
- */
-static void test_idle_falling_edge(void)
-{   
-    ir_fsm_handle_event(EVENT_FALLING, 1000, &fsm);
-    
-    /* Should remain in IDLE */
-    TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
-}
 
 static Test *tests_ir_fsm_tests(void)
 {
     EMB_UNIT_TESTFIXTURES(fixtures) {
         new_TestFixture(test_fsm_create),
-        new_TestFixture(test_valid_start_sequence),
-        new_TestFixture(test_invalid_start_timing),
+
+        new_TestFixture(test_idle_state),
+        new_TestFixture(test_start_state),
+        new_TestFixture(test_receive_state),
+        
         new_TestFixture(test_receive_logic_zero),
         new_TestFixture(test_receive_logic_one),
         new_TestFixture(test_receive_multiple_bits),
-        new_TestFixture(test_invalid_bit_timing),
         new_TestFixture(test_timing_tolerance),
-        new_TestFixture(test_timing_tolerance_exceeded),
-        new_TestFixture(test_idle_falling_edge),
     };
 
     EMB_UNIT_TESTCALLER(ir_fsm_tests, set_up, NULL, fixtures);
@@ -221,7 +248,7 @@ static Test *tests_ir_fsm_tests(void)
     return (Test *)&ir_fsm_tests;
 }
 
-void tests_infrared(void)
+void tests_ir_fsm(void)
 {
     TESTS_RUN(tests_ir_fsm_tests());
 }
