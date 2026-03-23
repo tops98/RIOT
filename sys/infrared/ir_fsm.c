@@ -27,9 +27,16 @@ typedef struct Transition{
 } transition_t;
 
 
+
+static void timer_callback(void *arg)
+{
+    ir_fsm_handle_event(EVENT_TIMEOUT, 0, arg);
+}
+
 static void arm_timer(ir_fsm_state_t *ctx){
     ctx->timer.arg = ctx;
-    ztimer_set(ctx->clock_ms, &ctx->timer, ctx->timing.transmission_timeout_ms);
+    ctx->timer.callback = timer_callback;
+    ztimer_set(ctx->clock_ms, &ctx->timer, ctx->timing->transmission_timeout_ms);
 }
 
 static void reset_timer(ir_fsm_state_t *ctx){
@@ -50,32 +57,32 @@ static void bit_received(ir_fsm_state_t *ctx, bool bit)
     }
 }
 
-bool check_timing(uint32_t duration_us, Timings timing, ir_fsm_state_t *ctx)
+static bool check_timing(uint32_t duration_us, Timings timing, ir_fsm_state_t *ctx)
 {
     uint32_t expected_duration_us = 0;
 
     switch(timing){
         case START_HIGH_TIME_US:
-            expected_duration_us = ctx->timing.start_high_time_us;        
+            expected_duration_us = ctx->timing->start_high_time_us;        
             break;
         case START_LOW_TIME_US:
-            expected_duration_us = ctx->timing.start_low_time_us;
+            expected_duration_us = ctx->timing->start_low_time_us;
             break;
         case RECV_HIGH_TIME_US:
-            expected_duration_us = ctx->timing.recv_high_time_us;
+            expected_duration_us = ctx->timing->recv_high_time_us;
             break;
         case ZERO_LOW_TIME_US:
-            expected_duration_us = ctx->timing.zero_low_time_us;
+            expected_duration_us = ctx->timing->zero_low_time_us;
             break;
         case ONE_LOW_TIME_US:
-            expected_duration_us = ctx->timing.one_low_time_us;
+            expected_duration_us = ctx->timing->one_low_time_us;
             break;   
     }
 
     uint32_t diff = (duration_us > expected_duration_us) ? 
                     (duration_us - expected_duration_us) : 
                     (expected_duration_us - duration_us);
-    return diff <= ctx->timing.timing_tollerance_us;
+    return diff <= ctx->timing->timing_tollerance_us;
 }
 
 static void receive_logic_0(ir_fsm_state_t *ctx)
@@ -88,13 +95,8 @@ static void receive_logic_1(ir_fsm_state_t *ctx)
     bit_received(ctx, true);
 }
 
-void reset_byte_buffer(ir_fsm_state_t *ctx){
+static void reset_byte_buffer(ir_fsm_state_t *ctx){
     ctx->current_byte = ctx->current_bit = 0;
-}
-
-void timer_callback(void *arg)
-{
-    ir_fsm_handle_event(EVENT_TIMEOUT, 0, arg);
 }
 
 
@@ -103,7 +105,7 @@ void timer_callback(void *arg)
  * If there are multiple transitions for the same STATE/EVENT pair,
  * the first matching transition will be used.
  */
-const transition_t fsm[] = {
+static const transition_t fsm[] = {
     /* IDLE STATE */
     { STATE_IDLE,    EVENT_FALLING, NULL,         0,                    NULL,               STATE_IDLE },
     { STATE_IDLE,    EVENT_RISING,  NULL,         0,                    arm_timer,          STATE_START },
@@ -155,7 +157,7 @@ void ir_fsm_handle_event(Event event, uint32_t duration_us, ir_fsm_state_t *ctx)
     }
 }
 
-ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, ir_transmission_timing_t timing, ztimer_clock_t* clock_ms){
+ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, const ir_transmission_timing_t* timing, ztimer_clock_t* clock_ms){
     
     ir_fsm_state_t fsm = {
         .timing = timing,
@@ -167,8 +169,6 @@ ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, ir_transmission_timing_t timin
     };
 
     ztimer_remove(fsm.clock_ms, &fsm.timer);
-    fsm.timer.callback = timer_callback;
-    fsm.timer.arg = NULL;
 
     return fsm;
 }

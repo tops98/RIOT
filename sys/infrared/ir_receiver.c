@@ -5,6 +5,20 @@
 #include <memory.h>
 
 
+static const ir_transmission_timing_t default_timing = {
+    .int_debouncing_time_us = 10, // TODO: move to receiver struct
+
+    .timing_tollerance_us = 400,
+    .transmission_timeout_ms = 2,
+    .start_high_time_us = 9000,
+    .start_low_time_us = 4500,
+    .recv_high_time_us = 560,
+    .zero_low_time_us = 560,
+    .one_low_time_us = 1687
+};
+
+const ir_transmission_timing_t* IR_DEFAULT_TIMING = &default_timing;
+
 void interrupt_callback(void* arg)
 {
     ir_receiver_t* ctx = (ir_receiver_t*)arg;
@@ -37,7 +51,7 @@ void ir_receiver_init(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buf
     ir_receiver_init_custom_timing(receiver, recv_gpio, in_buffer, buffer_size, IR_DEFAULT_TIMING);
 }
 
-void ir_receiver_init_custom_timing(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size, ir_transmission_timing_t timing){
+void ir_receiver_init_custom_timing(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size, const ir_transmission_timing_t *timing){
     memset(receiver, 0, sizeof(ir_receiver_t));
     
     receiver->fsm = ir_fsm_create(&receiver->recv_buffer, timing, ZTIMER_MSEC);

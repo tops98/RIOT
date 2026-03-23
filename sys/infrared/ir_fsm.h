@@ -38,23 +38,12 @@ typedef struct FsmState{
     uint8_t current_byte;
     uint8_t current_bit;
     tsrb_t *recv_buffer;
-    ir_transmission_timing_t timing;
+    const ir_transmission_timing_t *timing;
 } ir_fsm_state_t;
 
-static const ir_transmission_timing_t IR_DEFAULT_TIMING = {
-    .int_debouncing_time_us = 10, // TODO: move to receiver struct
-
-    .timing_tollerance_us = 400,
-    .transmission_timeout_ms = 2,
-    .start_high_time_us = 9000,
-    .start_low_time_us = 4500,
-    .recv_high_time_us = 560,
-    .zero_low_time_us = 560,
-    .one_low_time_us = 1687
-};
 
 /* Function declarations */
 void ir_fsm_handle_event(Event event, uint32_t duration_us, ir_fsm_state_t *ctx);
-ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, ir_transmission_timing_t timing, ztimer_clock_t* clock_ms);
+ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, const ir_transmission_timing_t *timing, ztimer_clock_t* clock_ms);
 
 #endif
