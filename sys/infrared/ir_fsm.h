@@ -21,7 +21,7 @@ typedef enum {
 } Event;
 
 typedef struct IrTransmissionTiming {
-    uint16_t int_debouncing_time_us;
+    uint16_t int_debouncing_time_us;  // TODO: move to receiver struct
     uint16_t timing_tollerance_us;
     uint16_t transmission_timeout_ms;
     uint16_t start_high_time_us;
@@ -33,6 +33,7 @@ typedef struct IrTransmissionTiming {
 
 typedef struct FsmState{
     State current_state;
+    ztimer_clock_t *clock_ms;
     ztimer_t timer;
     uint8_t current_byte;
     uint8_t current_bit;
@@ -41,7 +42,8 @@ typedef struct FsmState{
 } ir_fsm_state_t;
 
 static const ir_transmission_timing_t IR_DEFAULT_TIMING = {
-    .int_debouncing_time_us = 10,
+    .int_debouncing_time_us = 10, // TODO: move to receiver struct
+
     .timing_tollerance_us = 400,
     .transmission_timeout_ms = 2,
     .start_high_time_us = 9000,
@@ -53,6 +55,6 @@ static const ir_transmission_timing_t IR_DEFAULT_TIMING = {
 
 /* Function declarations */
 void ir_fsm_handle_event(Event event, uint32_t duration_us, ir_fsm_state_t *ctx);
-ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, ir_transmission_timing_t timing);
+ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, ir_transmission_timing_t timing, ztimer_clock_t* clock_ms);
 
 #endif

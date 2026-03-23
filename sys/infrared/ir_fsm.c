@@ -29,11 +29,11 @@ typedef struct Transition{
 
 static void arm_timer(ir_fsm_state_t *ctx){
     ctx->timer.arg = ctx;
-    ztimer_set(ZTIMER_MSEC, &ctx->timer, ctx->timing.transmission_timeout_ms);
+    ztimer_set(ctx->clock_ms, &ctx->timer, ctx->timing.transmission_timeout_ms);
 }
 
 static void reset_timer(ir_fsm_state_t *ctx){
-    ztimer_remove(ZTIMER_MSEC, &ctx->timer);
+    ztimer_remove(ctx->clock_ms, &ctx->timer);
     arm_timer(ctx);
 }
 
@@ -75,7 +75,7 @@ bool check_timing(uint32_t duration_us, Timings timing, ir_fsm_state_t *ctx)
     uint32_t diff = (duration_us > expected_duration_us) ? 
                     (duration_us - expected_duration_us) : 
                     (expected_duration_us - duration_us);
-    return diff < ctx->timing.timing_tollerance_us;
+    return diff <= ctx->timing.timing_tollerance_us;
 }
 
 static void receive_logic_0(ir_fsm_state_t *ctx)
@@ -114,6 +114,8 @@ const transition_t fsm[] = {
 
     { STATE_START,   EVENT_RISING, check_timing, START_LOW_TIME_US,     reset_byte_buffer,  STATE_RECEIVE },
     { STATE_START,   EVENT_RISING,  NULL,         0,                    NULL,               STATE_IDLE },
+    
+    { STATE_START,   EVENT_TIMEOUT, NULL,         0,                    NULL,               STATE_IDLE },
 
     /* RECEIVE STATE */
     { STATE_RECEIVE, EVENT_FALLING, check_timing, RECV_HIGH_TIME_US,    reset_timer,        STATE_RECEIVE },
@@ -153,17 +155,18 @@ void ir_fsm_handle_event(Event event, uint32_t duration_us, ir_fsm_state_t *ctx)
     }
 }
 
-ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, ir_transmission_timing_t timing){
+ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, ir_transmission_timing_t timing, ztimer_clock_t* clock_ms){
     
     ir_fsm_state_t fsm = {
         .timing = timing,
+        .clock_ms = clock_ms,
         .recv_buffer = recv_buffer,
         .current_bit = 0,
         .current_byte = 0,
         .current_state = STATE_IDLE,
     };
 
-    ztimer_remove(ZTIMER_MSEC, &fsm.timer);
+    ztimer_remove(fsm.clock_ms, &fsm.timer);
     fsm.timer.callback = timer_callback;
     fsm.timer.arg = NULL;
 

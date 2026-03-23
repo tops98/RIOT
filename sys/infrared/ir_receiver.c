@@ -40,7 +40,7 @@ void ir_receiver_init(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buf
 void ir_receiver_init_custom_timing(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size, ir_transmission_timing_t timing){
     memset(receiver, 0, sizeof(ir_receiver_t));
     
-    receiver->fsm = ir_fsm_create(&receiver->recv_buffer, timing);
+    receiver->fsm = ir_fsm_create(&receiver->recv_buffer, timing, ZTIMER_MSEC);
     receiver->rec_pin = recv_gpio;
 
     sema_create(&receiver->fsm_sema, 0);
