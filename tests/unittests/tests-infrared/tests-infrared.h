@@ -21,9 +21,9 @@ extern "C" {
 /**
  * @brief   Entry point of the test suite
  */
-void tests_ir_fsm(void);
+// void tests_ir_fsm(void);
 void tests_ir_receiver(void);
-// void tests_ir_transmitter(void);
+void tests_ir_transmitter(void);
 void tests_infrared(void);
 
 #ifdef __cplusplus

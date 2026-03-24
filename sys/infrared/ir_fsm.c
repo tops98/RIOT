@@ -14,8 +14,8 @@ typedef enum {
 } Timings;
 
 typedef void (*SendPulseFn)(uint32_t pulse_durration_us);
-typedef bool (*TimeGuardFn)(uint32_t duration_us, Timings expected_duration_us, ir_fsm_state_t *ctx);
-typedef void (*ActionFn)(ir_fsm_state_t *ctx);
+typedef bool (*TimeGuardFn)(ir_fsm_state_t *self, uint32_t duration_us, Timings expected_duration_us);
+typedef void (*ActionFn)(ir_fsm_state_t *self);
 
 typedef struct Transition{
     State       from;
@@ -30,73 +30,73 @@ typedef struct Transition{
 
 static void timer_callback(void *arg)
 {
-    ir_fsm_handle_event(EVENT_TIMEOUT, 0, arg);
+    ir_fsm_handle_event(arg, EVENT_TIMEOUT, 0);
 }
 
-static void arm_timer(ir_fsm_state_t *ctx){
-    ctx->timer.arg = ctx;
-    ctx->timer.callback = timer_callback;
-    ztimer_set(ctx->clock_ms, &ctx->timer, ctx->timing->transmission_timeout_ms);
+static void arm_timer(ir_fsm_state_t *self){
+    self->timer.arg = self;
+    self->timer.callback = timer_callback;
+    ztimer_set(self->clock_ms, &self->timer, self->timing->transmission_timeout_ms);
 }
 
-static void reset_timer(ir_fsm_state_t *ctx){
-    ztimer_remove(ctx->clock_ms, &ctx->timer);
-    arm_timer(ctx);
+static void reset_timer(ir_fsm_state_t *self){
+    ztimer_remove(self->clock_ms, &self->timer);
+    arm_timer(self);
 }
 
-static void bit_received(ir_fsm_state_t *ctx, bool bit)
+static void bit_received(ir_fsm_state_t *self, bool bit)
 {
-    reset_timer(ctx);
-
-    ctx->current_byte |= bit << (7 - ctx->current_bit++);
-    if(ctx->current_bit >=8){
-        if(tsrb_full(ctx->recv_buffer) == 0){
-            tsrb_add_one(ctx->recv_buffer, ctx->current_byte);
+    reset_timer(self);
+    int status = 0;
+    self->current_byte |= bit << (7 - self->current_bit++);
+    if(self->current_bit >=8){
+        if(tsrb_full(self->recv_buffer) == 0){
+            status = tsrb_add_one(self->recv_buffer, self->current_byte);
         }
-        ctx->current_byte = ctx->current_bit = 0;
+        self->current_byte = self->current_bit = 0;
     }
 }
 
-static bool check_timing(uint32_t duration_us, Timings timing, ir_fsm_state_t *ctx)
+static bool check_timing(ir_fsm_state_t *self,uint32_t duration_us, Timings timing)
 {
     uint32_t expected_duration_us = 0;
 
     switch(timing){
         case START_HIGH_TIME_US:
-            expected_duration_us = ctx->timing->start_high_time_us;        
+            expected_duration_us = self->timing->start_high_time_us;        
             break;
         case START_LOW_TIME_US:
-            expected_duration_us = ctx->timing->start_low_time_us;
+            expected_duration_us = self->timing->start_low_time_us;
             break;
         case RECV_HIGH_TIME_US:
-            expected_duration_us = ctx->timing->recv_high_time_us;
+            expected_duration_us = self->timing->recv_high_time_us;
             break;
         case ZERO_LOW_TIME_US:
-            expected_duration_us = ctx->timing->zero_low_time_us;
+            expected_duration_us = self->timing->zero_low_time_us;
             break;
         case ONE_LOW_TIME_US:
-            expected_duration_us = ctx->timing->one_low_time_us;
+            expected_duration_us = self->timing->one_low_time_us;
             break;   
     }
 
     uint32_t diff = (duration_us > expected_duration_us) ? 
                     (duration_us - expected_duration_us) : 
                     (expected_duration_us - duration_us);
-    return diff <= ctx->timing->timing_tollerance_us;
+    return diff <= self->timing->timing_tollerance_us;
 }
 
-static void receive_logic_0(ir_fsm_state_t *ctx)
+static void receive_logic_0(ir_fsm_state_t *self)
 {
-    bit_received(ctx, false);
+    bit_received(self, false);
 }
 
-static void receive_logic_1(ir_fsm_state_t *ctx)
+static void receive_logic_1(ir_fsm_state_t *self)
 {
-    bit_received(ctx, true);
+    bit_received(self, true);
 }
 
-static void reset_byte_buffer(ir_fsm_state_t *ctx){
-    ctx->current_byte = ctx->current_bit = 0;
+static void reset_byte_buffer(ir_fsm_state_t *self){
+    self->current_byte = self->current_bit = 0;
 }
 
 
@@ -131,28 +131,27 @@ static const transition_t fsm[] = {
 };
 static const uint8_t num_transitions = sizeof(fsm) / sizeof(transition_t);
 
-void ir_fsm_handle_event(Event event, uint32_t duration_us, ir_fsm_state_t *ctx)
+void ir_fsm_handle_event(ir_fsm_state_t *fsm_state, Event event, uint32_t duration_us)
 {
-
     transition_t current_transition = fsm[0];
     for (size_t i = 0; i <num_transitions; i++){
         current_transition= fsm[i];
         // check if event and state are matching the transition
-        if (current_transition.from != ctx->current_state || current_transition.event != event){
+        if (current_transition.from != fsm_state->current_state || current_transition.event != event){
             continue;
         }
         // is guard failing
-        if (current_transition.guard != NULL && !current_transition.guard(duration_us, current_transition.expected_duration_us, ctx)){
+        if (current_transition.guard != NULL && !current_transition.guard(fsm_state, duration_us, current_transition.expected_duration_us)){
             continue;
         }
 
         // execute action if available
         if (current_transition.action != NULL){
-            current_transition.action(ctx);
+            current_transition.action(fsm_state);
         }
-        // DEBUG_PRINT("\n\rSWITCHING FROM [%d] -> [%d] with event [%d] durartion = [%d]\n", ctx->current_state, current_transition.to, event, duration_us);
+        // DEBUG_PRINT("\n\rSWITCHING FROM [%d] -> [%d] with event [%d] durartion = [%d]\n", self->current_state, current_transition.to, event, duration_us);
         // switch state
-        ctx->current_state = current_transition.to;
+        fsm_state->current_state = current_transition.to;
         break;
     }
 }

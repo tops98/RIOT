@@ -6,8 +6,6 @@
 
 
 static const ir_transmission_timing_t default_timing = {
-    .int_debouncing_time_us = 10, // TODO: move to receiver struct
-
     .timing_tollerance_us = 400,
     .transmission_timeout_ms = 2,
     .start_high_time_us = 9000,
@@ -21,10 +19,10 @@ const ir_transmission_timing_t* IR_DEFAULT_TIMING = &default_timing;
 
 void interrupt_callback(void* arg)
 {
-    ir_receiver_t* ctx = (ir_receiver_t*)arg;
-    ctx->int_flank = gpio_read(ctx->rec_pin);
-    ctx->int_timestamp_us = ztimer_now(ZTIMER_USEC);
-    sema_post(&ctx->fsm_sema);
+    ir_receiver_t* self = (ir_receiver_t*)arg;
+    self->int_flank = gpio_read(self->rec_pin);
+    self->int_timestamp_us = ztimer_now(ZTIMER_USEC);
+    sema_post(&self->fsm_sema);
 }
 
 void *receive_thread(void* arg)
@@ -43,18 +41,14 @@ void *receive_thread(void* arg)
             rising_time = ctx->int_timestamp_us;
             duration = rising_time - falling_time;
         }
-        ir_fsm_handle_event(ctx->int_flank, duration, &ctx->fsm);
+        ir_fsm_handle_event(&ctx->fsm,ctx->int_flank, duration);
     }
 }
 
 void ir_receiver_init(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size){
-    ir_receiver_init_custom_timing(receiver, recv_gpio, in_buffer, buffer_size, IR_DEFAULT_TIMING);
-}
-
-void ir_receiver_init_custom_timing(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size, const ir_transmission_timing_t *timing){
     memset(receiver, 0, sizeof(ir_receiver_t));
     
-    receiver->fsm = ir_fsm_create(&receiver->recv_buffer, timing, ZTIMER_MSEC);
+    receiver->fsm = ir_fsm_create(&receiver->recv_buffer, IR_DEFAULT_TIMING, ZTIMER_MSEC);
     receiver->rec_pin = recv_gpio;
 
     sema_create(&receiver->fsm_sema, 0);

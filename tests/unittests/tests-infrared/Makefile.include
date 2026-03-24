@@ -1,5 +1,6 @@
 USEMODULE += infrared
 USEMODULE += tsrb
 USEMODULE += ztimer_mock
+USEMODULE += periph_gpio
 
 INCLUDES += -I$(RIOTBASE)/sys/infrared

@@ -23,7 +23,6 @@ typedef struct InfraredReceiver{
 extern const ir_transmission_timing_t *IR_DEFAULT_TIMING;
 
 
-void ir_receiver_init_custom_timing(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size, const ir_transmission_timing_t *timing);
 void ir_receiver_init(ir_receiver_t* receiver, gpio_t recv_gpio, uint8_t* in_buffer, uint32_t buffer_size);
 tsrb_t* ir_receiver_get_buffer(ir_receiver_t* ir_receiver);
 
