@@ -36,13 +36,14 @@ typedef struct FsmState{
     ztimer_t timer;
     uint8_t current_byte;
     uint8_t current_bit;
+    uint32_t droped_bytes;
     tsrb_t *recv_buffer;
     const ir_transmission_timing_t *timing;
 } ir_fsm_state_t;
 
 
 /* Function declarations */
-void ir_fsm_handle_event(ir_fsm_state_t *fsm_state, Event event, uint32_t duration_us);
-ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, const ir_transmission_timing_t *timing, ztimer_clock_t* clock_ms);
+int ir_fsm_handle_event(ir_fsm_state_t *fsm_state, Event event, uint32_t duration_us);
+int ir_fsm_init(ir_fsm_state_t *self, tsrb_t *recv_buffer, const ir_transmission_timing_t *timing, ztimer_clock_t* clock_ms);
 
 #endif

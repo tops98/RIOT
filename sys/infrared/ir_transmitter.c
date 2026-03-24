@@ -1,4 +1,7 @@
 #include "ir_transmitter.h"
+
+#include <errno.h>
+#include "log.h"
 #include "periph/pwm.h"
 #include "ztimer.h"
 
@@ -25,7 +28,13 @@ static void send_pulse(const ir_transmitter_t *self, uint32_t duration_us)
     pwm_set(PWM_DEV(self->pwm_channel), 0, self->pwm_config->off_duty_cycle);
 }
 
-void ir_transmitter_send(const ir_transmitter_t *transmitter, uint8_t* data, uint16_t len){
+int ir_transmitter_send(const ir_transmitter_t *transmitter, uint8_t* data, uint16_t len){
+
+    if(transmitter == NULL || data == NULL || len == 0){
+        LOG_ERROR("[ir_transmitter_send] NULL pointer\n");
+        return -EINVAL;
+    }
+
     uint8_t current_byte = 0;
     uint8_t current_bit = 0;
 
@@ -45,11 +54,20 @@ void ir_transmitter_send(const ir_transmitter_t *transmitter, uint8_t* data, uin
     }
     send_pulse(transmitter, transmitter->timing->recv_high_time_us);
     ir_transmitter_sleep(transmitter->clock_us, transmitter->timing->transmission_timeout_ms);
+
+    return 0;
 }
 
-void ir_transmitter_init(ir_transmitter_t *transmitter, uint8_t pwm_channel){
+int ir_transmitter_init(ir_transmitter_t *transmitter, uint8_t pwm_channel){
+    if(transmitter == NULL){
+        LOG_ERROR("[ir_transmitter_init] NULL pointer\n");
+        return -EINVAL;
+    }
+
     transmitter->pwm_channel = pwm_channel;
     transmitter->clock_us = ZTIMER_USEC;
     transmitter->timing = IR_DEFAULT_TIMING;
     transmitter->pwm_config = IR_DEFAULT_PWM_CONF;
+
+    return 0;
 }

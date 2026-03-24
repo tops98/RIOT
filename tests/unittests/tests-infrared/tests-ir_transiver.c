@@ -101,7 +101,7 @@ static void test_multiple_bytes_transmission(void)
     TEST_ASSERT_EQUAL_STRING((char*)expected_bytes, (char*)actual_bytes);
 }
 
-static Test *tests_ir_receiver_tests(void)
+static Test *tests_ir_transiver_tests(void)
 {
     EMB_UNIT_TESTFIXTURES(fixtures) {
         new_TestFixture(test_init_receiver),
@@ -109,14 +109,14 @@ static Test *tests_ir_receiver_tests(void)
         new_TestFixture(test_multiple_bytes_transmission),
     };
 
-    EMB_UNIT_TESTCALLER(ir_receiver_tests, set_up, NULL, fixtures);
+    EMB_UNIT_TESTCALLER(ir_transiver_tests, set_up, NULL, fixtures);
 
-    return (Test *)&ir_receiver_tests;
+    return (Test *)&ir_transiver_tests;
 }
 
-void tests_ir_receiver(void)
+void tests_ir_transiver(void)
 {
-    TESTS_RUN(tests_ir_receiver_tests());
+    TESTS_RUN(tests_ir_transiver_tests());
 }
 
 /** @} */

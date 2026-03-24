@@ -1,7 +1,9 @@
 #include "ir_fsm.h"
+
 #include <stddef.h>
-#include <ztimer.h>
-#include "debug.h"
+#include <errno.h>
+#include "ztimer.h"
+#include "log.h"
 
 
 
@@ -47,11 +49,13 @@ static void reset_timer(ir_fsm_state_t *self){
 static void bit_received(ir_fsm_state_t *self, bool bit)
 {
     reset_timer(self);
-    int status = 0;
     self->current_byte |= bit << (7 - self->current_bit++);
     if(self->current_bit >=8){
         if(tsrb_full(self->recv_buffer) == 0){
-            status = tsrb_add_one(self->recv_buffer, self->current_byte);
+            tsrb_add_one(self->recv_buffer, self->current_byte);
+        }else{
+            self->droped_bytes++;
+            LOG_WARNING("[ir_fsm] droped %d bytes\n", self->current_byte);
         }
         self->current_byte = self->current_bit = 0;
     }
@@ -131,8 +135,14 @@ static const transition_t fsm[] = {
 };
 static const uint8_t num_transitions = sizeof(fsm) / sizeof(transition_t);
 
-void ir_fsm_handle_event(ir_fsm_state_t *fsm_state, Event event, uint32_t duration_us)
+int ir_fsm_handle_event(ir_fsm_state_t *fsm_state, Event event, uint32_t duration_us)
 {
+    bool found = false;
+    if(fsm_state == NULL){
+        LOG_ERROR("[ir_fsm_handle_event] fsm_state is NULL\n");
+        return -EINVAL;
+    }
+
     transition_t current_transition = fsm[0];
     for (size_t i = 0; i <num_transitions; i++){
         current_transition= fsm[i];
@@ -144,30 +154,39 @@ void ir_fsm_handle_event(ir_fsm_state_t *fsm_state, Event event, uint32_t durati
         if (current_transition.guard != NULL && !current_transition.guard(fsm_state, duration_us, current_transition.expected_duration_us)){
             continue;
         }
-
         // execute action if available
         if (current_transition.action != NULL){
             current_transition.action(fsm_state);
         }
-        // DEBUG_PRINT("\n\rSWITCHING FROM [%d] -> [%d] with event [%d] durartion = [%d]\n", self->current_state, current_transition.to, event, duration_us);
         // switch state
         fsm_state->current_state = current_transition.to;
+        found = true;
         break;
     }
+
+    if(!found){
+        LOG_ERROR("[ir_fsm_handle_event] no matching transition found\n");
+        return -ENOTSUP;
+    }
+
+    return 0;
 }
 
-ir_fsm_state_t ir_fsm_create(tsrb_t *recv_buffer, const ir_transmission_timing_t* timing, ztimer_clock_t* clock_ms){
+int ir_fsm_init(ir_fsm_state_t *self, tsrb_t *recv_buffer, const ir_transmission_timing_t* timing, ztimer_clock_t* clock_ms){
     
-    ir_fsm_state_t fsm = {
-        .timing = timing,
-        .clock_ms = clock_ms,
-        .recv_buffer = recv_buffer,
-        .current_bit = 0,
-        .current_byte = 0,
-        .current_state = STATE_IDLE,
-    };
+    if(self == NULL || recv_buffer == NULL || timing == NULL || clock_ms == NULL){
+        LOG_ERROR("[ir_fsm_init] NULL pointer\n");
+        return -EINVAL;
+    }
+    
+    self->timing = timing;
+    self->clock_ms = clock_ms;
+    self->recv_buffer = recv_buffer;
+    self->current_bit = 0;
+    self->current_byte = 0;
+    self->current_state = STATE_IDLE;
 
-    ztimer_remove(fsm.clock_ms, &fsm.timer);
+    ztimer_remove(self->clock_ms, &self->timer);
 
-    return fsm;
+    return 0;
 }

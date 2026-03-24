@@ -23,10 +23,10 @@ static void set_up(void)
     tsrb_init(&recv_buff, buffer, sizeof(buffer));
     tsrb_clear(&recv_buff);
 
-    fsm = ir_fsm_create(&recv_buff, IR_DEFAULT_TIMING, &mock_timer_us.super);
+    ir_fsm_init(&fsm, &recv_buff, IR_DEFAULT_TIMING, &mock_timer_us.super);
 }
 
-static void test_fsm_create(void)
+static void test_fsm_init(void)
 {
     TEST_ASSERT_EQUAL_INT(STATE_IDLE, fsm.current_state);
     TEST_ASSERT_EQUAL_INT(0, fsm.current_bit);
@@ -232,7 +232,7 @@ static void test_timing_tolerance(void)
 static Test *tests_ir_fsm_tests(void)
 {
     EMB_UNIT_TESTFIXTURES(fixtures) {
-        new_TestFixture(test_fsm_create),
+        new_TestFixture(test_fsm_init),
 
         new_TestFixture(test_idle_state),
         new_TestFixture(test_start_state),

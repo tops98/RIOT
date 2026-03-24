@@ -23,7 +23,7 @@ typedef struct IR_Transmitter{
 
 extern const ir_pwm_config_t *IR_DEFAULT_PWM_CONF;
 
-void ir_transmitter_init(ir_transmitter_t *transmitter, uint8_t pwm_channel);
-void ir_transmitter_send(const ir_transmitter_t *tansmitter, uint8_t* data, uint16_t len);
+int ir_transmitter_init(ir_transmitter_t *transmitter, uint8_t pwm_channel);
+int ir_transmitter_send(const ir_transmitter_t *tansmitter, uint8_t* data, uint16_t len);
 
 #endif

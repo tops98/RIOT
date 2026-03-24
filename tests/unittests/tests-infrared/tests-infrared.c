@@ -15,7 +15,7 @@
 void tests_infrared(void)
 {
     tests_ir_fsm();
-    tests_ir_receiver();
+    tests_ir_transiver();
 }
 
 /** @} */
